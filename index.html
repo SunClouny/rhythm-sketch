@@ -80,6 +80,7 @@
     .status-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #ffffff2c; border-radius: 99px; padding: 5px 9px; color: #d2ded5; font-size: 10px; }
     .status-pill .live-dot { background: #86c59d; }
     .status-pill.recording .live-dot { background: #ff9b85; box-shadow: 0 0 0 4px #ff9b8523; animation: pulse 1.2s infinite; }
+    .status-pill.playing .live-dot { background: #b9e5c5; box-shadow: 0 0 0 4px #b9e5c523; animation: pulse 1.2s infinite; }
     @keyframes pulse { 50% { box-shadow: 0 0 0 7px #ff9b8500; } }
     .beat-display { height: 83px; display: flex; justify-content: center; align-items: center; gap: clamp(14px, 3vw, 28px); margin-bottom: 14px; }
     .beat { width: 13px; height: 13px; border-radius: 50%; background: #ffffff30; transition: transform .08s ease, background .08s ease; }
@@ -130,6 +131,8 @@
     .note-grid { display: grid; grid-auto-flow: column; padding: 2px 7px 7px; min-height: 56px; }
     .note-cell { min-width: 0; min-height: 48px; display: grid; place-items: center; position: relative; border-left: 1px solid #edf0e9; color: #aaa; font-family: "Noto Music", "Segoe UI Symbol", "Apple Symbols", serif; font-size: 23px; transition: background .18s; }
     .note-cell.beat-start { border-left: 1px solid #cfd5cd; }
+    .note-cell.tuplet { padding-top: 7px; }
+    .tuplet-number { position: absolute; top: 0; left: 50%; transform: translateX(-50%); font: 700 8px/1 ui-sans-serif, system-ui, sans-serif; color: var(--green); background: #f5f9f5; padding: 0 2px; }
     .note-cell.hit { color: var(--green-dark); background: #f5f9f5; }
     .note-cell.hit::after { content: ""; position: absolute; bottom: 2px; left: 50%; width: 4px; height: 4px; border-radius: 50%; background: var(--green); transform: translateX(-50%); }
     .note-cell.editable { cursor: pointer; }
@@ -218,7 +221,7 @@
           </div>
           <div class="settings-grid">
             <div class="field"><label for="numerator">拍子</label><div class="meter-control"><select id="numerator" class="select-control" aria-label="拍子の分子"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>12</option></select><span class="meter-slash">/</span><select id="denominator" class="select-control" aria-label="拍子の分母"><option selected>4</option><option>8</option></select></div></div>
-            <div class="field"><label for="resolution">最小単位</label><select id="resolution" class="select-control"><option value="4">4分音符</option><option value="8">8分音符</option><option value="16" selected>16分音符</option></select></div>
+            <div class="field"><label for="resolution">最小単位</label><select id="resolution" class="select-control"><option value="4">4分音符</option><option value="8">8分音符</option><option value="16" selected>16分音符</option><option value="triplet">3連符（1拍を3分割）</option></select></div>
             <div class="field" style="grid-column:1/-1"><label for="offset">曲の再生開始とアプリ開始の差</label><div style="display:flex;align-items:center;gap:8px"><input id="offset" class="number-control" type="number" min="-2000" max="2000" step="10" value="0" aria-label="曲の先行時間"><span style="color:var(--muted);font-size:12px">ms</span><button id="offsetClear" class="small-button" type="button">0に戻す</button></div></div>
             <div class="unit-note">正の値は「曲がアプリより先に始まった時間」です。採取タイミングを補正して譜面に合わせます。BPMは4分音符の速さです。</div>
           </div>
@@ -240,7 +243,7 @@
         <section class="card score-card" aria-labelledby="scoreTitle">
           <div class="score-head">
             <div class="card-head"><div><div class="step-label">04 · your rhythm</div><h2 class="card-title" id="scoreTitle" style="margin-top:5px">リズム譜</h2></div></div>
-            <div class="import-controls"><button class="small-button" id="exportJson" type="button" title="記録をJSONファイルで保存"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3M8 10 5 7m-2 5v1h10v-1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>JSON保存</button><button class="small-button" id="importButton" type="button" title="JSONファイルを読み込む"><svg viewBox="0 0 16 16" fill="none"><path d="M8 10V2m0 0L5 5m3-3 3 3m2 3v4H3V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>読み込み</button><input id="importFile" class="sr-only" type="file" accept=".json,application/json"></div>
+            <div class="import-controls"><button class="small-button" id="playbackButton" type="button" disabled title="記録したリズムを音で再生"><svg id="playbackIcon" viewBox="0 0 16 16" fill="none"><path d="m5 3.5 7 4.5-7 4.5v-9Z" fill="currentColor"/></svg><span id="playbackLabel">再生</span></button><button class="small-button" id="exportJson" type="button" title="記録をJSONファイルで保存"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3M8 10 5 7m-2 5v1h10v-1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>JSON保存</button><button class="small-button" id="importButton" type="button" title="JSONファイルを読み込む"><svg viewBox="0 0 16 16" fill="none"><path d="M8 10V2m0 0L5 5m3-3 3 3m2 3v4H3V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>読み込み</button><input id="importFile" class="sr-only" type="file" accept=".json,application/json"></div>
           </div>
           <div class="empty-score" id="emptyScore"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M8 18V6l11-2v12M8 9l11-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="5.5" cy="19" rx="2.8" ry="2" fill="currentColor"/><ellipse cx="16.5" cy="17" rx="2.8" ry="2" fill="currentColor"/></svg></div><div class="empty-title">あなたのリズムを採譜します</div><div class="empty-copy">「開始して記録」を押して、拍に合わせてタップ。<br>採取した音を小節ごとのリズム譜に並べます。</div></div>
           <div class="score-body" id="scoreBody" hidden></div>
@@ -282,6 +285,9 @@
       let audioContext = null;
       let scheduler = null;
       let session = null;
+      let playbackActive = false;
+      let playbackTimeout = null;
+      let playbackSources = [];
       let nextBeat = 0;
       let nextBeatTime = 0;
       let flashTimer = null;
@@ -293,13 +299,35 @@
         bpm: clamp(Number(bpmInput.value) || 100, 30, 260),
         numerator: Number(numerator.value),
         denominator: Number(denominator.value),
-        resolution: Number(resolution.value),
+        resolution: resolution.value === 'triplet' ? 'triplet' : Number(resolution.value),
         offsetMs: clamp(Number(offsetInput.value) || 0, -2000, 2000)
       });
       const quarterMs = () => 60000 / cfg().bpm;
       const beatMs = () => quarterMs() * 4 / cfg().denominator;
-      const stepMs = () => 240000 / cfg().resolution / cfg().bpm;
-      const stepsPerBar = () => Math.max(1, Math.round(cfg().numerator * cfg().resolution / cfg().denominator));
+      const stepsPerBeat = () => cfg().resolution === 'triplet' ? 3 : cfg().resolution / cfg().denominator;
+      const stepMs = () => cfg().resolution === 'triplet' ? beatMs() / 3 : 240000 / cfg().resolution / cfg().bpm;
+      const stepsPerBar = () => Math.max(1, Math.round(cfg().numerator * stepsPerBeat()));
+      const gridLabel = () => cfg().resolution === 'triplet' ? '3連符（1拍を3分割）' : `${cfg().resolution}分音符`;
+
+      function audioClockAt(performanceTime) {
+        if (audioContext?.getOutputTimestamp) {
+          const timestamp = audioContext.getOutputTimestamp();
+          if (Number.isFinite(timestamp.contextTime) && Number.isFinite(timestamp.performanceTime)) {
+            return timestamp.contextTime + (performanceTime - timestamp.performanceTime) / 1000;
+          }
+        }
+        return audioContext.currentTime + (performanceTime - performance.now()) / 1000;
+      }
+
+      function performanceTimeAtAudio(audioTime) {
+        if (audioContext?.getOutputTimestamp) {
+          const timestamp = audioContext.getOutputTimestamp();
+          if (Number.isFinite(timestamp.contextTime) && Number.isFinite(timestamp.performanceTime)) {
+            return timestamp.performanceTime + (audioTime - timestamp.contextTime) * 1000;
+          }
+        }
+        return performance.now() + (audioTime - audioContext.currentTime) * 1000;
+      }
 
       function showToast(message) {
         $('toast').textContent = message;
@@ -346,7 +374,7 @@
 
       function scheduleBeat(index, at) {
         const accent = index % Number(numerator.value) === 0;
-        const delay = Math.max(0, (at - audioContext.currentTime) * 1000);
+        const delay = Math.max(0, performanceTimeAtAudio(at) - performance.now());
         audioClick(accent, at);
         setTimeout(() => {
           if (session) {
@@ -365,16 +393,86 @@
         }
       }
 
-      async function startSession() {
-        if (session) { stopSession(); return; }
+      function playbackNote(at, accent) {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(accent ? 960 : 680, at);
+        gain.gain.setValueAtTime(.0001, at);
+        gain.gain.exponentialRampToValueAtTime(accent ? .2 : .13, at + .005);
+        gain.gain.exponentialRampToValueAtTime(.0001, at + .075);
+        osc.connect(gain).connect(audioContext.destination);
+        osc.start(at);
+        osc.stop(at + .08);
+        playbackSources.push(osc);
+        osc.onended = () => { playbackSources = playbackSources.filter(source => source !== osc); };
+      }
+
+      function updatePlaybackButton() {
+        $('playbackButton').disabled = (!taps.length || Boolean(session)) && !playbackActive;
+        $('playbackLabel').textContent = playbackActive ? '停止' : '再生';
+        $('playbackIcon').innerHTML = playbackActive
+          ? '<rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor"/>'
+          : '<path d="m5 3.5 7 4.5-7 4.5v-9Z" fill="currentColor"/>';
+      }
+
+      async function togglePlayback() {
+        if (playbackActive) { stopPlayback(); return; }
+        if (!taps.length) return;
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) { showToast('このブラウザーはWeb Audioに対応していません'); return; }
         try {
           if (!audioContext) audioContext = new AudioCtx();
           await audioContext.resume();
         } catch (_) { showToast('音声を開始できませんでした。ブラウザーの設定をご確認ください'); return; }
-        const startAudioAt = audioContext.currentTime + .12;
-        session = { startedAt: performance.now() + 120, startedIso: new Date().toISOString(), startAudioAt };
+        if (session) stopSession();
+
+        const events = taps.map(quantizedTap);
+        const captured = new Set(events.map(event => event.grid));
+        const maxGrid = Math.max(...captured);
+        const perBar = stepsPerBar();
+        const barCount = Math.floor(maxGrid / perBar) + 1;
+        const endGrid = barCount * perBar;
+        const hitGrids = new Set([...captured, ...[...manualEdits].filter(grid => grid >= 0)]);
+        for (const edit of manualEdits) if (edit < 0) hitGrids.delete(-edit - 1);
+
+        playbackActive = true;
+        setConfigDisabled(true);
+        statusPill.classList.add('playing');
+        statusText.textContent = '再生中';
+        updatePlaybackButton();
+        const startAt = audioContext.currentTime + .12;
+        const subdivisionMs = stepMs();
+        for (const grid of [...hitGrids].filter(grid => grid < endGrid).sort((a,b) => a-b)) {
+          playbackNote(startAt + grid * subdivisionMs / 1000, grid % stepsPerBeat() === 0);
+        }
+        playbackTimeout = setTimeout(stopPlayback, endGrid * subdivisionMs + 150);
+      }
+
+      function stopPlayback() {
+        if (!playbackActive) return;
+        clearTimeout(playbackTimeout);
+        playbackTimeout = null;
+        playbackSources.forEach(source => { try { source.stop(); } catch (_) {} });
+        playbackSources = [];
+        playbackActive = false;
+        statusPill.classList.remove('playing');
+        statusText.textContent = session ? '記録中' : '停止中';
+        setConfigDisabled(Boolean(session));
+        updatePlaybackButton();
+      }
+
+      async function startSession() {
+        if (session) { stopSession(); return; }
+        if (playbackActive) stopPlayback();
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) { showToast('このブラウザーはWeb Audioに対応していません'); return; }
+        try {
+          if (!audioContext) audioContext = new AudioCtx();
+          await audioContext.resume();
+        } catch (_) { showToast('音声を開始できませんでした。ブラウザーの設定をご確認ください'); return; }
+        const startAudioAt = audioContext.currentTime + .18;
+        session = { startedIso: new Date().toISOString(), startAudioAt };
         nextBeat = 0;
         nextBeatTime = startAudioAt;
         taps.length = 0;
@@ -406,10 +504,11 @@
         $('transportIcon').innerHTML = '<rect x="5" y="5" width="10" height="10" rx="1.5" fill="currentColor"/>';
       }
 
-      function tap() {
+      function tap(eventTime) {
         if (!session) { showToast('先に「開始して記録」を押してください'); return; }
-        const elapsed = performance.now() - session.startedAt;
-        taps.push({ elapsedMs: Math.round(elapsed), recordedAt: new Date().toISOString() });
+        const performanceTime = Number.isFinite(eventTime) ? eventTime : performance.now();
+        const elapsed = (audioClockAt(performanceTime) - session.startAudioAt) * 1000;
+        taps.push({ elapsedMs: Math.max(0, Math.round(elapsed)), recordedAt: new Date().toISOString() });
         tapSurface.classList.add('hit');
         setTimeout(() => tapSurface.classList.remove('hit'), 100);
         renderAll();
@@ -426,15 +525,17 @@
         const perBar = stepsPerBar();
         const bar = Math.floor(grid / perBar) + 1;
         const within = grid % perBar;
-        const beatStep = cfg().resolution / cfg().denominator;
+        const beatStep = stepsPerBeat();
         const beat = Math.floor(within / beatStep) + 1;
         const sub = within % beatStep;
+        if (cfg().resolution === 'triplet') return `${bar}小節 ${beat}拍 ${sub + 1}/3`;
         const subLabels = { 1: [''], 2: ['', '+'], 4: ['', 'e', '+', 'a'] }[beatStep] || Array.from({length:beatStep},(_,i)=>i===0?'':`+${i}`);
         return `${bar}小節 ${beat}拍${subLabels[sub] || ''}`;
       }
 
       function notationGlyph(isHit) {
         const res = cfg().resolution;
+        if (res === 'triplet') return isHit ? '♪' : '𝄾';
         if (isHit) return res === 4 ? '♩' : res === 8 ? '♪' : '♬';
         return res === 4 ? '𝄽' : res === 8 ? '𝄾' : '𝄿';
       }
@@ -450,9 +551,9 @@
         const hitSet = new Set(events.map(e => e.grid));
         const cellCount = perBar;
         const beats = Number(numerator.value);
-        const beatStep = cfg().resolution / cfg().denominator;
+        const beatStep = stepsPerBeat();
         const html = [];
-        html.push(`<div class="notation-legend"><span><i class="legend-dot" style="background:var(--green)"></i>タップした位置</span><span>空白は休符</span><span>${cfg().resolution}分音符グリッド</span></div>`);
+        html.push(`<div class="notation-legend"><span><i class="legend-dot" style="background:var(--green)"></i>タップした位置</span><span>空白は休符</span><span>${gridLabel()}</span>${cfg().resolution === 'triplet' ? '<span>各拍の「3」は3連符のまとまり</span>' : ''}</div>`);
         for (let bar=0; bar<barCount; bar++) {
           const firstGrid = bar * perBar;
           const notesInBar = events.filter(e => Math.floor(e.grid / perBar) === bar).length;
@@ -461,11 +562,12 @@
             const grid = firstGrid + i;
             const hit = manualEdits.has(grid) || (hitSet.has(grid) && !manualEdits.has(-grid - 1));
             const isStart = i % beatStep === 0;
-            return `<button type="button" class="note-cell editable${hit ? ' hit' : ''}${isStart ? ' beat-start' : ''}" data-grid="${grid}" aria-label="${formatPosition(grid)} ${hit ? '音符' : '休符'}">${notationGlyph(hit)}</button>`;
+            const tupletStart = cfg().resolution === 'triplet' && isStart;
+            return `<button type="button" class="note-cell editable${hit ? ' hit' : ''}${isStart ? ' beat-start' : ''}${cfg().resolution === 'triplet' ? ' tuplet' : ''}" data-grid="${grid}" aria-label="${formatPosition(grid)} ${hit ? '音符' : '休符'}">${tupletStart ? '<span class="tuplet-number">3</span>' : ''}${notationGlyph(hit)}</button>`;
           }).join('');
           html.push(`<article class="measure"><div class="measure-head"><span class="measure-title">${bar + 1} 小節目 <span style="font-weight:500;color:#8b8f86">${cfg().numerator}/${cfg().denominator}</span></span><span class="measure-count">${notesInBar} 音</span></div><div class="beat-labels" style="grid-template-columns:repeat(${beats},1fr)">${beatLabels}</div><div class="note-grid" style="grid-template-columns:repeat(${cellCount}, minmax(0,1fr))">${cells}</div></article>`);
         }
-        html.push(`<div class="score-hint">簡易リズム譜です。各マスは選択した最小単位を表します。小節内の音符・休符を押すと切り替わります。</div>`);
+        html.push(`<div class="score-hint">簡易リズム譜です。各マスは選択した最小単位を表します。音符・休符を押すと切り替えられます。再生ボタンで採譜したリズムを聴けます。</div>`);
         scoreBody.innerHTML = html.join('');
       }
 
@@ -508,6 +610,7 @@
         renderScore();
         renderTiming();
         renderMetrics();
+        updatePlaybackButton();
       }
 
       function setConfigDisabled(disabled) {
@@ -528,18 +631,24 @@
       startStop.addEventListener('click', startSession);
       $('reset').addEventListener('click', () => {
         stopSession();
+        stopPlayback();
         taps.length = 0;
         manualEdits.clear();
         renderAll();
         showToast('記録をクリアしました');
       });
-      tapSurface.addEventListener('click', tap);
-      tapSurface.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); tap(); } });
+      tapSurface.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        tap(event.timeStamp);
+      });
+      tapSurface.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); tap(event.timeStamp); } });
       document.addEventListener('keydown', (event) => {
         if (event.code !== 'Space' || event.repeat || event.target.matches('input,select,textarea,button')) return;
         event.preventDefault();
-        tap();
+        tap(event.timeStamp);
       });
+      $('playbackButton').addEventListener('click', togglePlayback);
       $('tapTempo').addEventListener('click', () => {
         const now = performance.now();
         tempoTaps = tempoTaps.filter(time => now - time < 4000);
@@ -585,12 +694,13 @@
           const data = JSON.parse(await file.text());
           if (!data || !Array.isArray(data.taps) || !data.settings) throw new Error('形式が違います');
           stopSession();
+          stopPlayback();
           const s = data.settings;
           bpmInput.value = normalizeBpm(s.bpm);
           const importedNumerator = Number(s.numerator);
           numerator.value = [2,3,4,5,6,7,8,9,12].includes(importedNumerator) ? String(importedNumerator) : '4';
           denominator.value = Number(s.denominator) === 8 ? '8' : '4';
-          resolution.value = [4,8,16].includes(Number(s.resolution)) ? String(s.resolution) : '16';
+          resolution.value = s.resolution === 'triplet' ? 'triplet' : ([4,8,16].includes(Number(s.resolution)) ? String(s.resolution) : '16');
           if (denominator.value === '8' && resolution.value === '4') resolution.value = '8';
           offsetInput.value = clamp(Number(s.offsetMs) || 0, -2000, 2000);
           taps.length = 0;
