@@ -108,6 +108,11 @@
     .score-card { overflow: hidden; }
     .score-head { padding: 19px 21px 15px; display: flex; justify-content: space-between; align-items: center; gap: 14px; border-bottom: 1px solid var(--line); }
     .score-head .card-head { margin: 0; }
+    .manual-entry { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 12px 21px; border-bottom: 1px solid var(--line); background: #fcfdfa; }
+    .manual-entry-title { font-size: 11px; font-weight: 730; margin-right: 3px; }
+    .manual-entry label { color: var(--muted); font-size: 10px; }
+    .manual-bars { width: 66px; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
+    .manual-entry-help { color: var(--muted); font-size: 10px; margin-left: auto; }
     .score-overview { display: flex; gap: 17px; align-items: center; }
     .metric { text-align: right; }
     .metric strong { display: block; font-size: 18px; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -161,6 +166,7 @@
       .shell { width: min(100% - 28px, 720px); }
       .card-pad { padding: 18px; }
       .score-head { padding: 17px 18px 14px; }
+      .manual-entry { padding: 11px 18px; }
       .score-body { padding: 16px 18px 19px; }
       .timing-section { padding: 15px 18px 17px; }
       .score-overview { gap: 11px; }
@@ -175,6 +181,7 @@
       .transport { padding: 17px; }
       .score-head { align-items: flex-start; }
       .score-overview { gap: 9px; }
+      .manual-entry-help { flex-basis: 100%; margin-left: 0; }
       .metric strong { font-size: 16px; }
       .metric span { font-size: 8px; }
       .timing-row { grid-template-columns: 22px 67px 1fr 43px; gap: 7px; }
@@ -245,6 +252,7 @@
             <div class="card-head"><div><div class="step-label">04 · your rhythm</div><h2 class="card-title" id="scoreTitle" style="margin-top:5px">リズム譜</h2></div></div>
             <div class="import-controls"><button class="small-button" id="playbackButton" type="button" disabled title="記録したリズムを音で再生"><svg id="playbackIcon" viewBox="0 0 16 16" fill="none"><path d="m5 3.5 7 4.5-7 4.5v-9Z" fill="currentColor"/></svg><span id="playbackLabel">再生</span></button><button class="small-button" id="exportJson" type="button" title="記録をJSONファイルで保存"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3M8 10 5 7m-2 5v1h10v-1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>JSON保存</button><button class="small-button" id="importButton" type="button" title="JSONファイルを読み込む"><svg viewBox="0 0 16 16" fill="none"><path d="M8 10V2m0 0L5 5m3-3 3 3m2 3v4H3V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>読み込み</button><input id="importFile" class="sr-only" type="file" accept=".json,application/json"></div>
           </div>
+          <div class="manual-entry"><span class="manual-entry-title">手入力</span><label for="manualBars">小節数</label><input class="manual-bars" id="manualBars" type="number" min="1" max="32" value="4" inputmode="numeric"><button class="small-button" id="makeManualScore" type="button">空の譜面を作る</button><span class="manual-entry-help">音符・休符のマスを押して入力</span></div>
           <div class="empty-score" id="emptyScore"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M8 18V6l11-2v12M8 9l11-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="5.5" cy="19" rx="2.8" ry="2" fill="currentColor"/><ellipse cx="16.5" cy="17" rx="2.8" ry="2" fill="currentColor"/></svg></div><div class="empty-title">あなたのリズムを採譜します</div><div class="empty-copy">「開始して記録」を押して、拍に合わせてタップ。<br>採取した音を小節ごとのリズム譜に並べます。</div></div>
           <div class="score-body" id="scoreBody" hidden></div>
           <section class="timing-section" aria-labelledby="timingTitle">
@@ -282,6 +290,7 @@
       const timingCount = $('timingCount');
       const taps = [];
       const manualEdits = new Set();
+      let manualMeasureCount = 0;
       let audioContext = null;
       let scheduler = null;
       let session = null;
@@ -361,6 +370,13 @@
         osc.connect(gain).connect(audioContext.destination);
         osc.start(at);
         osc.stop(at + .06);
+        return osc;
+      }
+
+      function trackPlaybackSource(source) {
+        if (!source) return;
+        playbackSources.push(source);
+        source.onended = () => { playbackSources = playbackSources.filter(item => item !== source); };
       }
 
       function flashBeat(index) {
@@ -396,20 +412,19 @@
       function playbackNote(at, accent) {
         const osc = audioContext.createOscillator();
         const gain = audioContext.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(accent ? 960 : 680, at);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(accent ? 560 : 440, at);
         gain.gain.setValueAtTime(.0001, at);
-        gain.gain.exponentialRampToValueAtTime(accent ? .2 : .13, at + .005);
-        gain.gain.exponentialRampToValueAtTime(.0001, at + .075);
+        gain.gain.exponentialRampToValueAtTime(accent ? .16 : .11, at + .005);
+        gain.gain.exponentialRampToValueAtTime(.0001, at + .09);
         osc.connect(gain).connect(audioContext.destination);
         osc.start(at);
-        osc.stop(at + .08);
-        playbackSources.push(osc);
-        osc.onended = () => { playbackSources = playbackSources.filter(source => source !== osc); };
+        osc.stop(at + .095);
+        trackPlaybackSource(osc);
       }
 
       function updatePlaybackButton() {
-        $('playbackButton').disabled = (!taps.length || Boolean(session)) && !playbackActive;
+        $('playbackButton').disabled = ((!taps.length && !manualMeasureCount) || Boolean(session)) && !playbackActive;
         $('playbackLabel').textContent = playbackActive ? '停止' : '再生';
         $('playbackIcon').innerHTML = playbackActive
           ? '<rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor"/>'
@@ -418,7 +433,7 @@
 
       async function togglePlayback() {
         if (playbackActive) { stopPlayback(); return; }
-        if (!taps.length) return;
+        if (!taps.length && !manualMeasureCount) return;
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) { showToast('このブラウザーはWeb Audioに対応していません'); return; }
         try {
@@ -429,9 +444,9 @@
 
         const events = taps.map(quantizedTap);
         const captured = new Set(events.map(event => event.grid));
-        const maxGrid = Math.max(...captured);
         const perBar = stepsPerBar();
-        const barCount = Math.floor(maxGrid / perBar) + 1;
+        const maxGrid = captured.size ? Math.max(...captured) : manualMeasureCount * perBar - 1;
+        const barCount = !taps.length && manualMeasureCount ? manualMeasureCount : Math.floor(maxGrid / perBar) + 1;
         const endGrid = barCount * perBar;
         const hitGrids = new Set([...captured, ...[...manualEdits].filter(grid => grid >= 0)]);
         for (const edit of manualEdits) if (edit < 0) hitGrids.delete(-edit - 1);
@@ -443,6 +458,14 @@
         updatePlaybackButton();
         const startAt = audioContext.currentTime + .12;
         const subdivisionMs = stepMs();
+        const totalBeats = barCount * cfg().numerator;
+        for (let beat = 0; beat < totalBeats; beat++) {
+          const at = startAt + beat * beatMs() / 1000;
+          const accent = beat % cfg().numerator === 0;
+          trackPlaybackSource(audioClick(accent, at));
+          const delay = Math.max(0, performanceTimeAtAudio(at) - performance.now());
+          setTimeout(() => { if (playbackActive) flashBeat(beat % cfg().numerator); }, delay);
+        }
         for (const grid of [...hitGrids].filter(grid => grid < endGrid).sort((a,b) => a-b)) {
           playbackNote(startAt + grid * subdivisionMs / 1000, grid % stepsPerBeat() === 0);
         }
@@ -477,6 +500,7 @@
         nextBeatTime = startAudioAt;
         taps.length = 0;
         manualEdits.clear();
+        manualMeasureCount = 0;
         setConfigDisabled(true);
         scheduler = setInterval(schedulerTick, 25);
         schedulerTick();
@@ -540,14 +564,19 @@
         return res === 4 ? '𝄽' : res === 8 ? '𝄾' : '𝄿';
       }
 
+      function scoreHasHit(grid, captured) {
+        return manualEdits.has(grid) || (captured.has(grid) && !manualEdits.has(-grid - 1));
+      }
+
       function renderScore() {
         const events = taps.map(quantizedTap).sort((a,b) => a.grid - b.grid || a.index - b.index);
-        emptyScore.hidden = taps.length > 0;
-        scoreBody.hidden = taps.length === 0;
-        if (!events.length) { scoreBody.innerHTML = ''; return; }
+        const hasScore = taps.length > 0 || manualMeasureCount > 0;
+        emptyScore.hidden = hasScore;
+        scoreBody.hidden = !hasScore;
+        if (!hasScore) { scoreBody.innerHTML = ''; return; }
         const perBar = stepsPerBar();
-        const maxGrid = Math.max(...events.map(e => e.grid));
-        const barCount = Math.max(1, Math.floor(maxGrid / perBar) + 1);
+        const maxGrid = events.length ? Math.max(...events.map(e => e.grid)) : manualMeasureCount * perBar - 1;
+        const barCount = !events.length && manualMeasureCount ? manualMeasureCount : Math.max(1, Math.floor(maxGrid / perBar) + 1);
         const hitSet = new Set(events.map(e => e.grid));
         const cellCount = perBar;
         const beats = Number(numerator.value);
@@ -556,11 +585,11 @@
         html.push(`<div class="notation-legend"><span><i class="legend-dot" style="background:var(--green)"></i>タップした位置</span><span>空白は休符</span><span>${gridLabel()}</span>${cfg().resolution === 'triplet' ? '<span>各拍の「3」は3連符のまとまり</span>' : ''}</div>`);
         for (let bar=0; bar<barCount; bar++) {
           const firstGrid = bar * perBar;
-          const notesInBar = events.filter(e => Math.floor(e.grid / perBar) === bar).length;
+          const notesInBar = Array.from({length:perBar}, (_,i) => scoreHasHit(firstGrid + i, hitSet)).filter(Boolean).length;
           const beatLabels = Array.from({length:beats}, (_,beat) => `<span>${beat + 1}</span>`).join('');
           const cells = Array.from({length:cellCount}, (_,i) => {
             const grid = firstGrid + i;
-            const hit = manualEdits.has(grid) || (hitSet.has(grid) && !manualEdits.has(-grid - 1));
+            const hit = scoreHasHit(grid, hitSet);
             const isStart = i % beatStep === 0;
             const tupletStart = cfg().resolution === 'triplet' && isStart;
             return `<button type="button" class="note-cell editable${hit ? ' hit' : ''}${isStart ? ' beat-start' : ''}${cfg().resolution === 'triplet' ? ' tuplet' : ''}" data-grid="${grid}" aria-label="${formatPosition(grid)} ${hit ? '音符' : '休符'}">${tupletStart ? '<span class="tuplet-number">3</span>' : ''}${notationGlyph(hit)}</button>`;
@@ -617,6 +646,7 @@
         [bpmInput,bpmRange,numerator,denominator,resolution,offsetInput].forEach(el => el.disabled = disabled);
         $('bpmDown').disabled = $('bpmUp').disabled = disabled;
         $('tapTempo').disabled = disabled;
+        $('manualBars').disabled = $('makeManualScore').disabled = disabled;
       }
 
       $('bpmDown').addEventListener('click', () => { normalizeBpm(Number(bpmInput.value) - 1); });
@@ -629,11 +659,23 @@
       }));
       $('offsetClear').addEventListener('click', () => { offsetInput.value = 0; renderAll(); });
       startStop.addEventListener('click', startSession);
+      $('manualBars').addEventListener('change', () => { $('manualBars').value = clamp(Math.round(Number($('manualBars').value) || 1), 1, 32); });
+      $('makeManualScore').addEventListener('click', () => {
+        if (session) stopSession();
+        if (playbackActive) stopPlayback();
+        manualMeasureCount = clamp(Math.round(Number($('manualBars').value) || 1), 1, 32);
+        $('manualBars').value = manualMeasureCount;
+        taps.length = 0;
+        manualEdits.clear();
+        renderAll();
+        showToast(`${manualMeasureCount}小節の譜面を作成しました。マスを押して入力してください`);
+      });
       $('reset').addEventListener('click', () => {
         stopSession();
         stopPlayback();
         taps.length = 0;
         manualEdits.clear();
+        manualMeasureCount = 0;
         renderAll();
         showToast('記録をクリアしました');
       });
@@ -663,11 +705,12 @@
       $('tapTempoReset').addEventListener('click', () => { tempoTaps = []; $('tapTempoHint').textContent = 'タップを4回以上'; });
 
       scoreBody.addEventListener('click', (event) => {
+        if (playbackActive) return;
         const cell = event.target.closest('.note-cell');
         if (!cell) return;
         const grid = Number(cell.dataset.grid);
-        const captured = taps.some((t,i) => quantizedTap(t,i).grid === grid);
-        const currentlyHit = manualEdits.has(grid) || (captured && !manualEdits.has(-grid - 1));
+        const captured = new Set(taps.map((tapItem,i) => quantizedTap(tapItem,i).grid));
+        const currentlyHit = scoreHasHit(grid, captured);
         manualEdits.delete(grid);
         manualEdits.delete(-grid - 1);
         manualEdits.add(currentlyHit ? -grid - 1 : grid);
@@ -675,7 +718,7 @@
       });
 
       $('exportJson').addEventListener('click', () => {
-        const data = { app: 'Rhythm Sketch', version: 1, savedAt: new Date().toISOString(), settings: cfg(), taps: taps.map((item,i) => ({ ...item, ...quantizedTap(item,i) })), manualEdits: [...manualEdits] };
+        const data = { app: 'Rhythm Sketch', version: 1, savedAt: new Date().toISOString(), settings: cfg(), taps: taps.map((item,i) => ({ ...item, ...quantizedTap(item,i) })), manualMeasureCount, manualEdits: [...manualEdits] };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -708,6 +751,8 @@
             const elapsedMs = Number(item.elapsedMs);
             if (Number.isFinite(elapsedMs) && elapsedMs >= 0) taps.push({ elapsedMs, recordedAt: item.recordedAt || null });
           });
+          manualMeasureCount = taps.length ? 0 : clamp(Math.round(Number(data.manualMeasureCount) || 0), 0, 32);
+          $('manualBars').value = manualMeasureCount || 4;
           manualEdits.clear();
           if (Array.isArray(data.manualEdits)) data.manualEdits.forEach(n => { if (Number.isInteger(n)) manualEdits.add(n); });
           renderBeats();
